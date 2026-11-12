@@ -31,13 +31,13 @@ unsigned long tempoInicioPiscada = 0;
 unsigned long contadorPiscadas = 0; // usado pela página para piscar junto
 
 // ===== ROTINA: olhar de um lado para o outro sozinho =====
-// Liga pelo botão da página (/rotina). Não tem botão de desligar: ela só para
+// Já começa ligada quando o ESP32 inicia. Não tem botão de desligar: ela só para
 // quando o usuário manda um comando manual, e pode ser ligada de novo em seguida.
-bool rotinaAtiva = false;
+bool rotinaAtiva = true;
 const int passosRotina[4] = {1, 0, 2, 0};   // esquerda, frente, direita, frente
-int passoRotina = 0;
+int passoRotina = 3;                        // o primeiro passo será o 0 (esquerda)
 unsigned long tempoPassoRotina = 0;         // quando o passo atual começou
-unsigned long duracaoPassoRotina = 0;       // quanto tempo fica no passo atual
+unsigned long duracaoPassoRotina = 2000;      // quanto tempo fica no passo atual
 
 // ===== LOG (guarda os últimos 25 eventos na memória) =====
 #define LOG_MAX 25
@@ -191,7 +191,7 @@ footer{border-top:2px dashed #1d1a16;padding:6px 16px;font-size:11px;display:fle
         <a href="/centro" data-s="0" class="btn">OLHAR PARA FRENTE</a>
         <a href="/direita" data-s="2" class="btn">OLHAR PARA DIREITA</a>
         <a href="/piscar" data-s="3" class="btn close">MANTER OLHOS FECHADOS</a>
-        <a href="/rotina" id="bRot" class="btn rot">ATIVAR ROTINA (OLHAR PARA OS LADOS)</a>
+        <a href="/rotina" id="bRot" class="btn rot">ROTINA</a>
       </div>
     </div>
 
@@ -226,7 +226,7 @@ footer{border-top:2px dashed #1d1a16;padding:6px 16px;font-size:11px;display:fle
 <script>
 var eyes=document.querySelectorAll('.eye'),pupils=document.querySelectorAll('.pupil'),
 btns=document.querySelectorAll('.btn'),txt=document.getElementById('txt'),
-nomes=['FRENTE','ESQUERDA','DIREITA','FECHADO'],offs=[0,-12,12],estado=0,olhoIR=-1;
+nomes=['FRENTE','ESQUERDA','DIREITA','FECHADO'],offs=[0,12,-12],estado=0,olhoIR=-1;
 function $(i){return document.getElementById(i)}
 
 function render(s,pisca){
@@ -240,7 +240,7 @@ function setEstado(s){
 /* botão da rotina: fica marcado enquanto ela está ligada no ESP */
 function setRotina(on){
   var b=$('bRot');b.classList.toggle('on',on);
-  b.textContent=on?'ROTINA ATIVA (OLHANDO PARA OS LADOS)':'ATIVAR ROTINA (OLHAR PARA OS LADOS)';
+  b.textContent='ROTINA';
 }
 
 /* ===== LOGS ===== */
@@ -368,9 +368,11 @@ uint8_t byteDoOlho(int estado, uint8_t pagina, uint8_t coluna) {
 
   if ((pagina == 2 || pagina == 5) && (coluna == 44 || coluna == 84)) return 0x00; // cantos
 
+  // Esquerda e direita são do ponto de vista do Frank (como se os olhos fossem seus).
+  // Para quem olha o Frank de frente, a pupila vai para o lado contrário.
   int offsetPupila = 0;
-  if (estado == 1) offsetPupila = -10;
-  if (estado == 2) offsetPupila = 10;
+  if (estado == 1) offsetPupila = 10;   // esquerda do Frank = direita de quem olha
+  if (estado == 2) offsetPupila = -10;  // direita do Frank = esquerda de quem olha
 
   if ((pagina == 3 || pagina == 4) &&
       coluna >= (58 + offsetPupila) && coluna <= (70 + offsetPupila)) return 0x00; // pupila
@@ -455,6 +457,8 @@ void setup() {
   }
   server.begin();
   addLog("Servidor web pronto na porta 80");
+  addLog("Rotina de olhar para os lados ativa");
+  tempoPassoRotina = millis(); // a rotina começa 2s depois de tudo pronto
 }
 
 bool wifiOk = true;
@@ -477,7 +481,7 @@ void loop() {
     inicioOlhoFechado = tempoAtual;
     totalPresencas++;
     atualizarOlhos(estadoOlho);
-    addLog(String("Presença detectada: fechou o olho ") + (olhoFechado == 0 ? "ESQUERDO" : "DIREITO") + " por 2s");
+    addLog(String("Presença detectada: fechou o olho ") + (olhoFechado == 0 ? "DIREITO" : "ESQUERDO") + " por 2s");
   }
   irAntes = irAgora;
 
